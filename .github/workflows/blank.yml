@@ -1,0 +1,54 @@
+# A workflow to run a Windows VM with RDP, NoMachine, and playit.gg
+name: Windows VM with Playit.gg
+
+# Controls when the workflow will run
+on:
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+jobs:
+  # This workflow contains a single job called "build"
+  build:
+    # The type of runner that the job will run on
+    runs-on: windows-latest
+    
+    # Set a timeout for the job to 6 hours (360 minutes)
+    timeout-minutes: 360
+
+    # Steps represent a sequence of tasks that will be executed as part of the job
+    steps:
+      # We don't need to check out the repository for this use case
+      # - uses: actions/checkout@v4
+
+      # Step 1: Set up RDP access to the runner.
+      # It will print the credentials and connection command in the logs.
+      - name: Setup RDP
+        uses: mickem/gh-rdp-action@v1
+        with:
+          # You need to create these secrets in your repository settings
+          # Go to Settings > Secrets and variables > Actions > New repository secret
+          rdp_user: ${{ secrets.RDP_USER }}
+          rdp_pass: ${{ secrets.RDP_PASS }}
+
+      # Step 2: Download and install NoMachine and the playit.gg agent using PowerShell
+      - name: Install NoMachine and playit.gg
+        shell: powershell
+        run: |
+          echo "Downloading NoMachine..."
+          Invoke-WebRequest -Uri 'https://download.nomachine.com/download/8.11/Windows/nomachine_8.11.3_4.exe' -OutFile 'nomachine.exe'
+          echo "Installing NoMachine silently..."
+          Start-Process -FilePath '.\nomachine.exe' -ArgumentList '/SILENT' -Wait
+          echo "NoMachine installation complete."
+
+          echo "Downloading playit.gg agent..."
+          Invoke-WebRequest -Uri 'https://github.com/playit-cloud/playit-agent/releases/download/v0.16.3/playit-windows-x86_64.exe' -OutFile 'playit.exe'
+          echo "Starting playit.gg agent in the background..."
+          Start-Process -FilePath '.\playit.exe'
+          echo "playit.gg agent has been started."
+
+      # Step 3: Keep the runner alive.
+      # The workflow would end after the last step, so we add a long sleep.
+      # 6 hours = 6 * 60 * 60 = 21600 seconds.
+      - name: Keep alive for 6 hours
+        shell: powershell
+        run: Start-Sleep -Seconds 21600
