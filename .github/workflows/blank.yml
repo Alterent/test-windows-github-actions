@@ -28,7 +28,7 @@ jobs:
         # 2. Authenticate
         & $ngrokExe authtoken $Env:NGROK_AUTH_TOKEN
         
-        # 3. Explicitly set region to Asia Pacific (AP) in the config file (v3 best practice)
+        # 3. Explicitly set region to Asia Pacific (AP) in the config file
         $configPath = Split-Path $configFile -Parent
         if (-not (Test-Path $configPath)) { New-Item -Path $configPath -ItemType Directory -Force }
         
@@ -54,54 +54,46 @@ jobs:
         # Start ngrok using the configuration file settings
         Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -NoNewWindow
         
-    - name: Wait for and Log Ngrok Tunnel IP and Credentials
+    - name: Wait for and Print Raw Curl Output
       run: |
         $api_url = "http://127.0.0.1:4040/api/tunnels"
         $max_attempts = 15 # Wait up to 75 seconds total
         $attempt = 0
-        $tunnels = $null
+
+        Write-Host "::notice title=Starting Tunnel::Waiting for ngrok API to respond..."
 
         # Implement polling logic using curl.exe
         do {
             $attempt++
-            Write-Host "Attempting to connect to ngrok API using curl.exe... (Attempt $attempt of $max_attempts)"
+            Write-Host "Attempt $attempt of $max_attempts..."
             
             try {
                 # Execute curl.exe and capture the raw output string
-                # We use the '&' operator to ensure we execute curl.exe directly, not the PowerShell alias
+                # -s (silent), -S (show errors on failure), --fail (fail silently on >400 status)
                 $json_output = & curl.exe $api_url -s -S --fail 2>$null
                 
-                # Convert the resulting JSON string into a PowerShell object
-                $tunnels = $json_output | ConvertFrom-Json
-                
-                Write-Host "Ngrok API connected successfully."
-                break
+                # If curl succeeded and returned data, print it and break the loop
+                if ($json_output) {
+                    Write-Host "::notice title=Ngrok API Response::Tunnel information logged below (find 'public_url'):"
+                    Write-Host $json_output
+                    break # Success! Exit loop
+                }
             }
             catch {
-                # This catch block handles connection refusal or HTTP failure (due to --fail flag)
-                if ($attempt -ge $max_attempts) {
-                    Write-Error "Failed to connect to ngrok API after $max_attempts attempts. Exiting."
-                    exit 1
-                }
-                # Wait 5 seconds before retrying
-                Start-Sleep -Seconds 5
+                # Handles connection refusal or HTTP failure if curl throws an exception
+                Write-Host "Connection failed or returned empty data."
             }
-        } while ($tunnels -eq $null)
-
-        # Log the connection details
-        $rdp_url = $tunnels.tunnels[0].public_url
-
-        Write-Host "::notice title=RDP Connection Established::"
-        Write-Host "::notice::"
-        Write-Host "::notice::-----------------------------------------------------"
-        Write-Host "::notice::RDP ADDRESS: $rdp_url"
-        Write-Host "::notice::USERNAME: runneradmin"
-        Write-Host "::notice::PASSWORD: ${{ secrets.RDP_PASSWORD }}"
-        Write-Host "::notice::-----------------------------------------------------"
-        Write-Host "::notice::"
+            
+            # Check maximum attempts and wait
+            if ($attempt -ge $max_attempts) {
+                Write-Error "Failed to get response from ngrok API after $max_attempts attempts. Exiting."
+                exit 1
+            }
+            Start-Sleep -Seconds 5
+        } while ($true) 
 
     - name: Keep Job Alive
       # Use infinite loop to hold the runner open
       run: |
-        Write-Host "Keeping the job alive for 360 minutes..."
+        Write-Host "::notice title=Job Active::Keeping the job alive for 360 minutes. Use the information above to connect."
         while ($true) { Start-Sleep -Seconds 60 }
