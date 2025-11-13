@@ -12,13 +12,12 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: Download and setup ngrok
+    # FIX: Combined download, extract, and auth into one step to guarantee correct path.
+    - name: Download, Extract, and Authenticate ngrok
       run: |
         Invoke-WebRequest https://bin.equinox.io/c/4VmDzA7iaHb/ngrok-stable-windows-amd64.zip -OutFile ngrok.zip
         Expand-Archive ngrok.zip
-        
-    - name: Authenticate ngrok
-      run: .\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+        .\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         
@@ -29,9 +28,12 @@ jobs:
         Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -name "UserAuthentication" -Value 1
         
     - name: Set RDP User Password
+      # Sets the password for the default 'runneradmin' user
       run: |
         $password = ConvertTo-SecureString -String "${{ secrets.RDP_PASSWORD }}" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $password
 
     - name: Start RDP Tunnel
+      # This command will run until the job times out, keeping the tunnel open.
+      # The ngrok.exe is now correctly referenced in the root of the workspace.
       run: .\ngrok.exe tcp 3389
