@@ -20,7 +20,7 @@ jobs:
         Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
         Expand-Archive ngrok.zip
         # Authenticate and set region to Asia Pacific (ap)
-        .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN --region ap
+        .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN --region=ap
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         
