@@ -12,9 +12,8 @@ jobs:
         Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
         Expand-Archive ngrok.zip
         .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
-        # Add region to existing config file (don't add version again)
-        $configFile = "$Env:USERPROFILE\AppData\Local\ngrok\ngrok.yml"
-        Add-Content -Path $configFile -Value "region: ap"
+        # Add region using v3 syntax
+        .\ngrok\ngrok.exe config add-region ap
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
     
