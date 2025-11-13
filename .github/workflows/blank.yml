@@ -12,8 +12,6 @@ jobs:
         Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
         Expand-Archive ngrok.zip
         .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
-        # Add region using v3 syntax
-        .\ngrok\ngrok.exe config add-region ap
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
     
@@ -25,38 +23,5 @@ jobs:
         $password = ConvertTo-SecureString -String "${{ secrets.RDP_PASSWORD }}" -AsPlainText -Force
         Set-LocalUser -Name "runneradmin" -Password $password
     
-    - name: Start Ngrok
-      run: Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -NoNewWindow
-    
-    - name: Get Ngrok Info
-      run: |
-        Write-Host "Waiting for ngrok API to be ready..."
-        $maxAttempts = 30
-        $attempt = 0
-        $success = $false
-        
-        while ($attempt -lt $maxAttempts -and -not $success) {
-          try {
-            $response = curl.exe -s http://127.0.0.1:4040/api/tunnels
-            if ($LASTEXITCODE -eq 0 -and $response) {
-              Write-Host "Ngrok API is ready!"
-              Write-Host $response
-              $success = $true
-            }
-          } catch {
-            Write-Host "Attempt $($attempt + 1): API not ready yet..."
-          }
-          
-          if (-not $success) {
-            Start-Sleep -Seconds 2
-            $attempt++
-          }
-        }
-        
-        if (-not $success) {
-          Write-Host "ERROR: Ngrok API failed to start after $maxAttempts attempts"
-          exit 1
-        }
-    
-    - name: Keep Job Alive
-      run: while ($true) { Start-Sleep -Seconds 60 }
+    - name: Start Ngrok (keeps job alive)
+      run: .\ngrok\ngrok.exe tcp --region=ap 3389
