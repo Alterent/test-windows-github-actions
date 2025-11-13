@@ -12,10 +12,9 @@ jobs:
         Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
         Expand-Archive ngrok.zip
         .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
-        # Force Asia Pacific region in config file
+        # Add region to existing config file (don't add version again)
         $configFile = "$Env:USERPROFILE\AppData\Local\ngrok\ngrok.yml"
-        if (-not (Test-Path (Split-Path $configFile))) { New-Item -Path (Split-Path $configFile) -ItemType Directory -Force }
-        @("version: 2", "region: ap") | Out-File $configFile -Encoding UTF8 -Append
+        Add-Content -Path $configFile -Value "region: ap"
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
     
