@@ -36,4 +36,4 @@ jobs:
     - name: Start RDP Tunnel
       # This command will run until the job times out, keeping the tunnel open.
       # The ngrok.exe is now correctly referenced in the root of the workspace.
-      run: .\ngrok.exe tcp 3389
+      run: .\ngrok\ngrok.exe tcp 3389
