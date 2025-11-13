@@ -14,12 +14,28 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    - name: Download, Extract, and Authenticate ngrok
+    - name: Download, Extract, and Configure ngrok (Asia Pacific Region)
       run: |
+        # Define ngrok path
+        $ngrokDir = ".\ngrok"
+        $ngrokExe = "$ngrokDir\ngrok.exe"
+        $configFile = "$Env:USERPROFILE\AppData\Local\ngrok\ngrok.yml"
+
+        # 1. Download and Extract
         Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
         Expand-Archive ngrok.zip
-        # Authenticate token (ngrok v3 automatically configures region)
-        .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
+        
+        # 2. Authenticate
+        & $ngrokExe authtoken $Env:NGROK_AUTH_TOKEN
+        
+        # 3. Explicitly set region to Asia Pacific (AP) in the config file
+        # We must ensure the AppData directory structure exists
+        $configPath = Split-Path $configFile -Parent
+        if (-not (Test-Path $configPath)) { New-Item -Path $configPath -ItemType Directory -Force }
+        
+        # Write the region setting directly to the ngrok YAML configuration file
+        @("version: 2", "region: ap") | Out-File $configFile -Encoding UTF8 -Append
+        
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
         
@@ -36,23 +52,23 @@ jobs:
 
     - name: Start Ngrok Tunnel in Background
       run: |
-        # Start ngrok targeting TCP 3389 in the background.
+        # Start ngrok using the configuration file settings
         Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -NoNewWindow
         
     - name: Wait for and Log Ngrok Tunnel IP and Credentials
       run: |
         $api_url = "http://127.0.0.1:4040/api/tunnels"
-        $max_attempts = 15 # Wait up to 15 attempts (75 seconds)
+        $max_attempts = 15 # Wait up to 75 seconds total
         $attempt = 0
         $tunnels = $null
 
-        # Implement polling logic to wait for the ngrok API to become available
+        # Implement polling logic using Invoke-RestMethod (best practice for PowerShell JSON API access)
         do {
             $attempt++
             Write-Host "Attempting to connect to ngrok API... (Attempt $attempt of $max_attempts)"
             
             try {
-                # Try connecting. If it fails, the catch block runs.
+                # Attempt connection; use -ErrorAction Stop to jump to catch block on failure
                 $tunnels = Invoke-RestMethod -Uri $api_url -ErrorAction Stop
                 Write-Host "Ngrok API connected successfully."
                 break
@@ -67,7 +83,7 @@ jobs:
             }
         } while ($tunnels -eq $null)
 
-        # Proceed with logging if connection was successful
+        # Log the connection details
         $rdp_url = $tunnels.tunnels[0].public_url
 
         Write-Host "::notice title=RDP Connection Established::"
@@ -80,7 +96,7 @@ jobs:
         Write-Host "::notice::"
 
     - name: Keep Job Alive
-      # Since ngrok is running in the background, we use an infinite loop to prevent the job from exiting
+      # Use infinite loop to hold the runner open
       run: |
         Write-Host "Keeping the job alive for 360 minutes..."
         while ($true) { Start-Sleep -Seconds 60 }
