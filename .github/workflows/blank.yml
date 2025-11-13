@@ -14,12 +14,11 @@ jobs:
     timeout-minutes: 360
 
     steps:
-    # FIX: Combined download, extract, and auth into one step to guarantee correct path.
-    - name: Download, Extract, and Authenticate ngrok (Asia Pacific Region)
+    - name: Download, Extract, and Authenticate ngrok
       run: |
         Invoke-WebRequest https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-windows-amd64.zip -OutFile ngrok.zip
         Expand-Archive ngrok.zip
-        # Authenticate and set region to Asia Pacific (ap)
+        # FIX: Removed deprecated --region flag
         .\ngrok\ngrok.exe authtoken $Env:NGROK_AUTH_TOKEN
       env:
         NGROK_AUTH_TOKEN: ${{ secrets.NGROK_AUTH_TOKEN }}
@@ -38,15 +37,16 @@ jobs:
 
     - name: Start Ngrok Tunnel in Background
       run: |
-        # Start ngrok, targetting TCP 3389, using the Asia Pacific region, running in the background.
-        Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389 --region ap" -NoNewWindow
-        # Wait a few seconds for the tunnel to establish
-        Start-Sleep -Seconds 5
+        # FIX: Removed deprecated --region flag. Ngrok defaults to lowest latency or uses region from ngrok.yml if configured manually.
+        Start-Process -FilePath ".\ngrok\ngrok.exe" -ArgumentList "tcp 3389" -NoNewWindow
+        # Increased sleep time to ensure the API is fully ready
+        Start-Sleep -Seconds 10 
         
     - name: Log Ngrok Tunnel IP and Credentials
       run: |
         # Query the local ngrok API (port 4040) to get the public URL
         $tunnels = Invoke-RestMethod -Uri http://127.0.0.1:4040/api/tunnels
+        # Access the first tunnel's public URL
         $rdp_url = $tunnels.tunnels[0].public_url
 
         Write-Host "::notice title=RDP Connection Established::"
