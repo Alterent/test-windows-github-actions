@@ -16,7 +16,7 @@ jobs:
     steps:
     - name: Download, Extract, and Configure ngrok (Asia Pacific Region)
       run: |
-        # Define ngrok path
+        # Define paths
         $ngrokDir = ".\ngrok"
         $ngrokExe = "$ngrokDir\ngrok.exe"
         $configFile = "$Env:USERPROFILE\AppData\Local\ngrok\ngrok.yml"
@@ -28,8 +28,7 @@ jobs:
         # 2. Authenticate
         & $ngrokExe authtoken $Env:NGROK_AUTH_TOKEN
         
-        # 3. Explicitly set region to Asia Pacific (AP) in the config file
-        # We must ensure the AppData directory structure exists
+        # 3. Explicitly set region to Asia Pacific (AP) in the config file (v3 best practice)
         $configPath = Split-Path $configFile -Parent
         if (-not (Test-Path $configPath)) { New-Item -Path $configPath -ItemType Directory -Force }
         
@@ -62,18 +61,24 @@ jobs:
         $attempt = 0
         $tunnels = $null
 
-        # Implement polling logic using Invoke-RestMethod (best practice for PowerShell JSON API access)
+        # Implement polling logic using curl.exe
         do {
             $attempt++
-            Write-Host "Attempting to connect to ngrok API... (Attempt $attempt of $max_attempts)"
+            Write-Host "Attempting to connect to ngrok API using curl.exe... (Attempt $attempt of $max_attempts)"
             
             try {
-                # Attempt connection; use -ErrorAction Stop to jump to catch block on failure
-                $tunnels = Invoke-RestMethod -Uri $api_url -ErrorAction Stop
+                # Execute curl.exe and capture the raw output string
+                # We use the '&' operator to ensure we execute curl.exe directly, not the PowerShell alias
+                $json_output = & curl.exe $api_url -s -S --fail 2>$null
+                
+                # Convert the resulting JSON string into a PowerShell object
+                $tunnels = $json_output | ConvertFrom-Json
+                
                 Write-Host "Ngrok API connected successfully."
                 break
             }
             catch {
+                # This catch block handles connection refusal or HTTP failure (due to --fail flag)
                 if ($attempt -ge $max_attempts) {
                     Write-Error "Failed to connect to ngrok API after $max_attempts attempts. Exiting."
                     exit 1
